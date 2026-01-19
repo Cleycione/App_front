@@ -1,0 +1,71 @@
+import { Post } from '../components/PostCard';
+
+export const mockPosts: Post[] = [
+  {
+    id: '1',
+    imageUrl: 'https://images.unsplash.com/photo-1721471699577-dc255604578f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsb3N0JTIwZG9nJTIwc3RyZWV0fGVufDF8fHx8MTc2NzYxNzIxOXww&ixlib=rb-4.1.0&q=80&w=1080',
+    status: 'lost',
+    location: 'Jardim Paulista, São Paulo',
+    distance: '0.8 km',
+    date: 'Há 2 horas',
+    animal: {
+      species: 'Cão',
+      size: 'Médio',
+      color: 'Marrom',
+    },
+    urgent: true,
+  },
+  {
+    id: '2',
+    imageUrl: 'https://images.unsplash.com/photo-1684707458757-1d33524680d1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGNhdCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NzYxNzIyMHww&ixlib=rb-4.1.0&q=80&w=1080',
+    status: 'found',
+    location: 'Vila Madalena, São Paulo',
+    distance: '1.2 km',
+    date: 'Há 5 horas',
+    animal: {
+      species: 'Gato',
+      size: 'Pequeno',
+      color: 'Branco',
+    },
+  },
+  {
+    id: '3',
+    imageUrl: 'https://images.unsplash.com/photo-1615233500064-caa995e2f9dd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkZW4lMjByZXRyaWV2ZXIlMjBwdXBweXxlbnwxfHx8fDE3Njc1MTc1Njd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    status: 'care',
+    location: 'Pinheiros, São Paulo',
+    distance: '2.5 km',
+    date: 'Há 1 dia',
+    animal: {
+      species: 'Cão',
+      size: 'Grande',
+      color: 'Dourado',
+    },
+  },
+  {
+    id: '4',
+    imageUrl: 'https://images.unsplash.com/photo-1511377465862-2579b9c87623?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMGRvZyUyMHJlc2N1ZXxlbnwxfHx8fDE3Njc2MTcyMjB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    status: 'found',
+    location: 'Moema, São Paulo',
+    distance: '3.1 km',
+    date: 'Há 3 dias',
+    animal: {
+      species: 'Cão',
+      size: 'Médio',
+      color: 'Preto',
+    },
+  },
+  {
+    id: '5',
+    imageUrl: 'https://images.unsplash.com/photo-1765739001803-9bc520b5b7ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGRvZyUyMG91dGRvb3J8ZW58MXx8fHwxNzY3NTMzOTE2fDA&ixlib=rb-4.1.0&q=80&w=1080',
+    status: 'lost',
+    location: 'Itaim Bibi, São Paulo',
+    distance: '4.2 km',
+    date: 'Há 2 dias',
+    animal: {
+      species: 'Cão',
+      size: 'Grande',
+      color: 'Marrom',
+    },
+    urgent: true,
+  },
+];

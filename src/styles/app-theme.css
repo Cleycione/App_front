@@ -1,0 +1,111 @@
+/* PetMatch Color System */
+:root {
+  /* Cores principais do PetMatch */
+  --petmatch-primary: #2563EB;
+  --petmatch-success: #22C55E;
+  --petmatch-urgent: #F97316;
+  --petmatch-bg-light: #F8FAFC;
+  --petmatch-text: #111827;
+  --petmatch-text-muted: #6B7280;
+  
+  /* Cores de status */
+  --petmatch-lost: #F97316;
+  --petmatch-found: #22C55E;
+  --petmatch-care: #2563EB;
+  --petmatch-resolved: #6B7280;
+  
+  /* Cores de UI */
+  --petmatch-border: #E5E7EB;
+  --petmatch-hover: #F3F4F6;
+  
+  /* Aplicar no app */
+  --app-bg-light: var(--petmatch-bg-light);
+}
+
+/* Status chips cores */
+.status-lost {
+  background-color: #FFF7ED;
+  color: #F97316;
+  border-color: #FDBA74;
+}
+
+.status-found {
+  background-color: #F0FDF4;
+  color: #16A34A;
+  border-color: #86EFAC;
+}
+
+.status-care {
+  background-color: #EFF6FF;
+  color: #2563EB;
+  border-color: #93C5FD;
+}
+
+.status-urgent {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+.status-resolved {
+  background-color: #F9FAFB;
+  color: #6B7280;
+  border-color: #D1D5DB;
+}
+
+/* High Contrast Status Chips */
+[data-high-contrast="true"] .status-lost {
+  background-color: #EA580C;
+  color: #FFFFFF;
+  border-color: #9A3412;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+[data-high-contrast="true"] .status-found {
+  background-color: #16A34A;
+  color: #FFFFFF;
+  border-color: #166534;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+[data-high-contrast="true"] .status-care {
+  background-color: #1D4ED8;
+  color: #FFFFFF;
+  border-color: #1E3A8A;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+[data-high-contrast="true"] .status-urgent {
+  background-color: #DC2626;
+  color: #FFFFFF;
+  border-color: #991B1B;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+[data-high-contrast="true"] .status-resolved {
+  background-color: #4B5563;
+  color: #FFFFFF;
+  border-color: #1F2937;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+/* High Contrast Cards */
+[data-high-contrast="true"] .bg-white {
+  border-width: 2px;
+  border-color: var(--app-gray-900);
+}
+
+/* High Contrast Buttons */
+[data-high-contrast="true"] button:not(.toggle):not([role="switch"]) {
+  border-width: 2px;
+  font-weight: 600;
+}
+
+[data-high-contrast="true"] .bg-\[var\(--app-primary\)\] {
+  border-color: #1E3A8A;
+}
