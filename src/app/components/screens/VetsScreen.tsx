@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, ArrowLeft, MapPin, Star, Phone, Clock, AlertCircle, PlusCircle } from 'lucide-react';
-import { mockVetsData } from '../../data/mockVetsData';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { vetsApi } from '../../api/endpoints';
+import { toUiVet } from '../../api/mappers';
 
 interface VetsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -15,21 +16,46 @@ export function VetsScreen({ onNavigate }: VetsScreenProps) {
     minRating: 0,
     type: 'all' as 'all' | 'vet' | 'clinic'
   });
+  const [vets, setVets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredVets = mockVetsData.filter(vet => {
-    if (searchQuery && !vet.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !vet.location.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    if (filters.emergency24h && !vet.emergency24h) return false;
-    if (filters.emergencyAccepted && !vet.acceptsEmergency) return false;
-    if (filters.minRating && vet.rating < filters.minRating) return false;
-    if (filters.type !== 'all') {
-      if (filters.type === 'vet' && vet.type !== 'Veterinário') return false;
-      if (filters.type === 'clinic' && vet.type !== 'Clínica') return false;
-    }
-    return true;
-  });
+  useEffect(() => {
+    const fetchVets = async () => {
+      setIsLoading(true);
+      try {
+        const response = await vetsApi.list({
+          page: 0,
+          size: 50,
+          lat: -23.5615,
+          lng: -46.6559,
+          radiusKm: 20,
+        });
+        setVets(response.content.map(toUiVet));
+      } catch {
+        setVets([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchVets();
+  }, []);
+
+  const filteredVets = useMemo(() => {
+    return vets.filter(vet => {
+      if (searchQuery && !vet.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !vet.location.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      if (filters.emergency24h && !vet.emergency24h) return false;
+      if (filters.emergencyAccepted && !vet.acceptsEmergency) return false;
+      if (filters.minRating && vet.rating < filters.minRating) return false;
+      if (filters.type !== 'all') {
+        if (filters.type === 'vet' && vet.type !== 'Veterinário') return false;
+        if (filters.type === 'clinic' && vet.type !== 'Clínica') return false;
+      }
+      return true;
+    });
+  }, [vets, searchQuery, filters]);
 
   const toggleFilter = (filterName: string) => {
     setFilters(prev => ({
@@ -154,7 +180,11 @@ export function VetsScreen({ onNavigate }: VetsScreenProps) {
         </p>
 
         <div className="space-y-3">
-          {filteredVets.map(vet => (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-[var(--petmatch-text-muted)]">Carregando veterinários...</p>
+            </div>
+          ) : filteredVets.map(vet => (
             <div
               key={vet.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

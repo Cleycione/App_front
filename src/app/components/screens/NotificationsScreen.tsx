@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell, Heart, MessageCircle, CheckCircle, MapPin, AtSign, Gift } from 'lucide-react';
 import { Card } from '../ui/Card';
+import { notificationsApi } from '../../api/endpoints';
+import { toUiNotification } from '../../api/mappers';
 
 interface NotificationsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -17,96 +19,35 @@ interface Notification {
   priority?: 'high' | 'normal';
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'mention',
-    title: 'Você foi mencionado',
-    message: 'Maria Silva mencionou você no chat da comunidade.',
-    time: 'Há 15 minutos',
-    read: false,
-    priority: 'high',
-  },
-  {
-    id: '2',
-    type: 'donation',
-    title: 'Nova doação na sua região',
-    message: 'Um Golden Retriever está disponível para adoção a 1.2 km de você.',
-    time: 'Há 20 minutos',
-    read: false,
-    imageUrl: 'https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=100',
-  },
-  {
-    id: '3',
-    type: 'match',
-    title: 'Possível match encontrado!',
-    message: 'Um animal semelhante ao que você perdeu foi encontrado a 1.2km de distância.',
-    time: 'Há 30 minutos',
-    read: false,
-    imageUrl: 'https://images.unsplash.com/photo-1615233500064-caa995e2f9dd?w=100',
-  },
-  {
-    id: '4',
-    type: 'patinha',
-    title: 'Você ganhou uma Patinha! 🐾',
-    message: 'Parabéns! Você ganhou +1 Patinha por devolver um pet ao dono.',
-    time: 'Há 1 hora',
-    read: false,
-  },
-  {
-    id: '5',
-    type: 'donation',
-    title: 'Interesse na sua doação',
-    message: 'Ana Costa demonstrou interesse no pet que você está doando.',
-    time: 'Há 2 horas',
-    read: true,
-  },
-  {
-    id: '6',
-    type: 'comment',
-    title: 'Nova solicitação: "Eu sou o dono"',
-    message: 'Maria Silva enviou uma solicitação dizendo ser dona do pet que você encontrou.',
-    time: 'Há 2 horas',
-    read: false,
-  },
-  {
-    id: '7',
-    type: 'community',
-    title: 'Nova mensagem na comunidade',
-    message: 'Há 3 novas mensagens no chat da comunidade.',
-    time: 'Há 3 horas',
-    read: true,
-  },
-  {
-    id: '8',
-    type: 'help',
-    title: 'Alguém quer ajudar!',
-    message: 'João Santos se ofereceu para ser cuidador temporário.',
-    time: 'Há 5 horas',
-    read: true,
-  },
-  {
-    id: '9',
-    type: 'resolved',
-    title: 'Animal reunido com o dono!',
-    message: 'Parabéns! O animal que você ajudou foi reunido com seu dono.',
-    time: 'Há 1 dia',
-    read: true,
-  },
-  {
-    id: '10',
-    type: 'match',
-    title: 'Atualização do caso',
-    message: 'O post que você compartilhou teve 15 novas visualizações.',
-    time: 'Há 2 dias',
-    read: true,
-  },
-];
-
 type TabType = 'all' | 'mentions';
 
 export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
   const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMentions, setUnreadMentions] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      setIsLoading(true);
+      try {
+        const [listResponse, countResponse] = await Promise.all([
+          notificationsApi.list({ page: 0, size: 50 }),
+          notificationsApi.unreadCount(),
+        ]);
+        const mapped = listResponse.content.map(toUiNotification) as Notification[];
+        setNotifications(mapped);
+        setUnreadCount(countResponse.count);
+        setUnreadMentions(mapped.filter(n => n.type === 'mention' && !n.read).length);
+      } catch {
+        setNotifications([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -130,11 +71,8 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
   };
 
   const filteredNotifications = activeTab === 'mentions' 
-    ? mockNotifications.filter(n => n.type === 'mention')
-    : mockNotifications;
-
-  const unreadCount = mockNotifications.filter(n => !n.read).length;
-  const unreadMentions = mockNotifications.filter(n => n.type === 'mention' && !n.read).length;
+    ? notifications.filter(n => n.type === 'mention')
+    : notifications;
 
   return (
     <div className="min-h-screen bg-[var(--app-gray-50)] pb-24">
@@ -186,7 +124,12 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
 
       {/* Notifications List */}
       <div className="px-4 py-6 space-y-3">
-        {filteredNotifications.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Bell size={48} className="text-[var(--app-gray-300)] mx-auto mb-4" />
+            <p className="text-[var(--app-gray-500)]">Carregando notificações...</p>
+          </div>
+        ) : filteredNotifications.length === 0 ? (
           <div className="text-center py-12">
             <Bell size={48} className="text-[var(--app-gray-300)] mx-auto mb-4" />
             <p className="text-[var(--app-gray-500)]">

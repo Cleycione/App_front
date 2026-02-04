@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Send, Image, AlertCircle, Info } from 'lucide-react';
 import { Card } from '../ui/Card';
+import { communityApi } from '../../api/endpoints';
+import { toUiMessage } from '../../api/mappers';
 
 interface CommunityScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -18,87 +20,50 @@ interface Message {
   isPinned?: boolean;
 }
 
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    userId: 'system',
-    userName: 'PetMatch',
-    message: '📌 Bem-vindos ao chat da comunidade! Aqui você pode conversar com outros membros, pedir ajuda e compartilhar dicas. Use @ para mencionar alguém.',
-    timestamp: '10:00',
-    isPinned: true,
-  },
-  {
-    id: '2',
-    userId: 'system',
-    userName: 'PetMatch',
-    message: '📌 Regras: Seja respeitoso, não compartilhe informações pessoais sensíveis, e ajude sempre que possível.',
-    timestamp: '10:01',
-    isPinned: true,
-  },
-  {
-    id: '3',
-    userId: '1',
-    userName: 'Maria Silva',
-    userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    message: 'Olá pessoal! Alguém viu um golden retriever na região do Jardim Paulista?',
-    timestamp: '14:30',
-  },
-  {
-    id: '4',
-    userId: '2',
-    userName: 'João Santos',
-    userAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    message: '@Maria Silva Oi Maria! Vi sim, estava próximo ao parque ontem à tarde.',
-    timestamp: '14:35',
-    mentions: ['Maria Silva'],
-  },
-  {
-    id: '5',
-    userId: '3',
-    userName: 'Ana Costa',
-    userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    message: 'Gente, acabei de encontrar um gatinho na rua. Já registrei no app!',
-    timestamp: '15:20',
-  },
-  {
-    id: '6',
-    userId: '1',
-    userName: 'Maria Silva',
-    userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    message: '@João Santos Muito obrigada! Vou verificar lá 🙏',
-    timestamp: '15:25',
-    mentions: ['João Santos'],
-  },
-];
-
 export function CommunityScreen({ onNavigate }: CommunityScreenProps) {
   const [messageInput, setMessageInput] = useState('');
-  const [messages, setMessages] = useState(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const currentUser = 'João Silva'; // Mock current user
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      setIsLoading(true);
+      try {
+        const response = await communityApi.listMessages({ page: 0, size: 50 });
+        setMessages(response.content.map(toUiMessage));
+      } catch {
+        setMessages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMessages();
+  }, []);
 
   const pinnedMessages = messages.filter(m => m.isPinned);
   const regularMessages = messages.filter(m => !m.isPinned);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!messageInput.trim()) return;
 
     // Extract mentions
     const mentions = messageInput.match(/@[\w\s]+/g)?.map(m => m.slice(1).trim()) || [];
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      userId: 'current',
-      userName: currentUser,
-      message: messageInput,
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      mentions,
-    };
-
-    setMessages([...messages, newMessage]);
-    setMessageInput('');
-    setShowMentionSuggestions(false);
+    try {
+      await communityApi.sendMessage({
+        message: messageInput,
+        mentions,
+      });
+      const response = await communityApi.listMessages({ page: 0, size: 50 });
+      setMessages(response.content.map(toUiMessage));
+      setMessageInput('');
+      setShowMentionSuggestions(false);
+    } catch {
+      alert('Não foi possível enviar a mensagem.');
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -214,7 +179,11 @@ export function CommunityScreen({ onNavigate }: CommunityScreenProps) {
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Pinned Messages */}
-        {pinnedMessages.length > 0 && (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-[var(--app-gray-500)]">Carregando mensagens...</p>
+          </div>
+        ) : pinnedMessages.length > 0 && (
           <div className="mb-4">
             {pinnedMessages.map(message => (
               <div key={message.id}>

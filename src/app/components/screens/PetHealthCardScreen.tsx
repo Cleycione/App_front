@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Camera, Plus, Trash2, Upload, FileText, Shield, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { petsApi } from '../../api/endpoints';
 
 interface PetHealthCardScreenProps {
   onBack: () => void;
@@ -36,41 +37,17 @@ interface Disease {
 }
 
 export function PetHealthCardScreen({ onBack, onNavigate, pet }: PetHealthCardScreenProps) {
-  const [birthDate, setBirthDate] = useState('2020-05-15');
+  const [birthDate, setBirthDate] = useState('');
   const [isEstimatedDate, setIsEstimatedDate] = useState(false);
-  const [isCastrated, setIsCastrated] = useState(true);
-  const [hasMicrochip, setHasMicrochip] = useState(true);
-  const [microchipCode, setMicrochipCode] = useState('123456789012345');
-  const [address, setAddress] = useState('Rua das Flores, 123 - Jardim Paulista, São Paulo - SP');
+  const [isCastrated, setIsCastrated] = useState(false);
+  const [hasMicrochip, setHasMicrochip] = useState(false);
+  const [microchipCode, setMicrochipCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   
-  const [vaccines, setVaccines] = useState<Vaccine[]>([
-    {
-      id: '1',
-      name: 'Raiva',
-      appliedDate: '2025-03-10',
-      nextDose: '2026-03-10',
-      notes: 'Dose anual',
-      proofUploaded: true,
-    },
-    {
-      id: '2',
-      name: 'V10 (Polivalente)',
-      appliedDate: '2025-02-15',
-      nextDose: '2026-02-15',
-      notes: 'Reforço anual',
-      proofUploaded: true,
-    },
-  ]);
+  const [vaccines, setVaccines] = useState<Vaccine[]>([]);
 
-  const [diseases, setDiseases] = useState<Disease[]>([
-    {
-      id: '1',
-      name: 'Alergia alimentar',
-      inTreatment: true,
-      medication: 'Ração hipoalergênica',
-      startDate: '2024-11-01',
-    },
-  ]);
+  const [diseases, setDiseases] = useState<Disease[]>([]);
 
   const [showAddVaccine, setShowAddVaccine] = useState(false);
   const [showAddDisease, setShowAddDisease] = useState(false);
@@ -90,7 +67,67 @@ export function PetHealthCardScreen({ onBack, onNavigate, pet }: PetHealthCardSc
     'Giárdia',
   ];
 
-  const handleSave = () => {
+  useEffect(() => {
+    const fetchHealthCard = async () => {
+      setIsLoading(true);
+      try {
+        const healthCard = await petsApi.getHealthCard(pet.id);
+        setBirthDate(healthCard.birthDate ?? '');
+        setIsEstimatedDate(healthCard.isEstimatedDate);
+        setIsCastrated(healthCard.isCastrated);
+        setHasMicrochip(healthCard.hasMicrochip);
+        setMicrochipCode(healthCard.microchipCode ?? '');
+        setAddress(healthCard.address ?? '');
+        setVaccines(
+          (healthCard.vaccines ?? []).map((v, index) => ({
+            id: `${index}-${v.name}`,
+            name: v.name,
+            appliedDate: v.appliedDate ?? '',
+            nextDose: v.nextDose ?? '',
+            notes: v.notes ?? '',
+            proofUploaded: !!v.proofUploaded,
+          })),
+        );
+        setDiseases(
+          (healthCard.conditions ?? []).map((d, index) => ({
+            id: `${index}-${d.name}`,
+            name: d.name,
+            inTreatment: d.inTreatment,
+            medication: d.medication ?? '',
+            startDate: d.startDate ?? '',
+          })),
+        );
+      } catch {
+        // Keep defaults if backend not ready
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHealthCard();
+  }, [pet.id]);
+
+  const handleSave = async () => {
+    await petsApi.putHealthCard(pet.id, {
+      birthDate: birthDate || undefined,
+      isEstimatedDate,
+      isCastrated,
+      hasMicrochip,
+      microchipCode: microchipCode || undefined,
+      address,
+      vaccines: vaccines.map((v) => ({
+        name: v.name,
+        appliedDate: v.appliedDate || undefined,
+        nextDose: v.nextDose || undefined,
+        notes: v.notes || undefined,
+        proofUploaded: v.proofUploaded,
+      })),
+      conditions: diseases.map((d) => ({
+        name: d.name,
+        inTreatment: d.inTreatment,
+        medication: d.medication || undefined,
+        startDate: d.startDate || undefined,
+      })),
+    });
     setShowSaveSuccess(true);
     setTimeout(() => setShowSaveSuccess(false), 3000);
   };

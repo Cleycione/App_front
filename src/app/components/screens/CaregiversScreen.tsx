@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Filter, MapPin, Star, UserPlus } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Search, Filter, Star, UserPlus } from 'lucide-react';
 import { CaregiverCard, Caregiver } from '../CaregiverCard';
-import { mockCaregiversData } from '../../data/mockCaregiversData';
+import { caregiversApi } from '../../api/endpoints';
+import { toUiCaregiver } from '../../api/mappers';
 
 interface CaregiversScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -10,6 +11,8 @@ interface CaregiversScreenProps {
 export function CaregiversScreen({ onNavigate }: CaregiversScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const filters = [
     '1km', '5km', '10km', '20km',
@@ -29,25 +32,42 @@ export function CaregiversScreen({ onNavigate }: CaregiversScreenProps) {
     );
   };
 
-  const filteredCaregiversData = mockCaregiversData.filter(caregiver => {
-    // Search filter
-    if (searchQuery && !caregiver.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !caregiver.location.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
-    // Rating filter
-    if (selectedFilters.includes('4+ estrelas') && caregiver.rating < 4) {
-      return false;
-    }
-    
-    // Emergency filter
-    if (selectedFilters.includes('Aceita emergências') && !caregiver.acceptsEmergency) {
-      return false;
-    }
-    
-    return true;
-  });
+  useEffect(() => {
+    const fetchCaregivers = async () => {
+      setIsLoading(true);
+      try {
+        const response = await caregiversApi.list({
+          page: 0,
+          size: 50,
+          lat: -23.5615,
+          lng: -46.6559,
+          radiusKm: 20,
+        });
+        setCaregivers(response.content.map(toUiCaregiver));
+      } catch {
+        setCaregivers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCaregivers();
+  }, []);
+
+  const filteredCaregiversData = useMemo(() => {
+    return caregivers.filter(caregiver => {
+      if (searchQuery && !caregiver.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !caregiver.location.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      if (selectedFilters.includes('4+ estrelas') && caregiver.rating < 4) {
+        return false;
+      }
+      if (selectedFilters.includes('Aceita emergências') && !caregiver.acceptsEmergency) {
+        return false;
+      }
+      return true;
+    });
+  }, [caregivers, searchQuery, selectedFilters]);
 
   return (
     <div className="min-h-screen bg-[var(--petmatch-bg-light)] pb-20">
@@ -121,7 +141,11 @@ export function CaregiversScreen({ onNavigate }: CaregiversScreenProps) {
         </div>
 
         {/* Caregivers list */}
-        {filteredCaregiversData.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-[var(--petmatch-text-muted)]">Carregando cuidadores...</p>
+          </div>
+        ) : filteredCaregiversData.length > 0 ? (
           filteredCaregiversData.map(caregiver => (
             <CaregiverCard
               key={caregiver.id}

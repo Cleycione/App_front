@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowLeft, Camera, Check, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { donationsApi, uploadsApi, usersApi } from '../../api/endpoints';
 
 interface CreateDonationScreenProps {
   onBack: () => void;
@@ -13,6 +14,10 @@ interface CreateDonationScreenProps {
 export function CreateDonationScreen({ onBack, onNavigate }: CreateDonationScreenProps) {
   const [step, setStep] = useState(1);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState({
     petName: '',
     species: '',
@@ -31,15 +36,55 @@ export function CreateDonationScreen({ onBack, onNavigate }: CreateDonationScree
   });
 
   const handlePhotoUpload = () => {
-    const mockPhotos = [
-      'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600',
-      'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=600',
-    ];
-    setPhotos([...photos, mockPhotos[photos.length % mockPhotos.length]]);
+    fileInputRef.current?.click();
   };
 
-  const handlePublish = () => {
-    onNavigate('donation-published');
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setPhotos((prev) => [...prev, previewUrl]);
+    setPhotoFiles((prev) => [...prev, file]);
+  };
+
+  const handlePublish = async () => {
+    setIsSubmitting(true);
+    setErrorMessage('');
+    try {
+      const uploads = await Promise.all(photoFiles.map((file) => uploadsApi.upload(file)));
+      const uploadedUrls = uploads.map((u) => u.url);
+      const me = await usersApi.getMe();
+
+      await donationsApi.create({
+        petName: formData.petName,
+        species: formData.species,
+        size: formData.size,
+        ageRange: formData.ageRange,
+        photos: uploadedUrls,
+        dewormed: formData.dewormed,
+        neutered: formData.neutered,
+        vaccinated: formData.vaccinated,
+        hasPreexistingCondition: formData.hasPreexistingCondition,
+        conditionDetails: formData.conditionDetails,
+        observations: formData.observations,
+        temperament: formData.temperament,
+        goodWithKids: formData.goodWithKids,
+        goodWithPets: formData.goodWithPets,
+        donorName: me.name,
+        donorPhone: me.phone,
+        donorEmail: me.email,
+        showPhone: formData.showPhone,
+        memberSince: new Date(me.createdAt).getFullYear().toString(),
+        status: 'ACTIVE',
+        publishedDate: new Date().toISOString(),
+      });
+
+      onNavigate('donation-published');
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao publicar doação.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const totalSteps = 4;
@@ -96,6 +141,13 @@ export function CreateDonationScreen({ onBack, onNavigate }: CreateDonationScree
                 </button>
               )}
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
 
             <p className="text-xs text-[var(--app-gray-500)]">
               Adicione de 1 a 5 fotos (recomendado: pelo menos 2 fotos)
@@ -464,9 +516,12 @@ export function CreateDonationScreen({ onBack, onNavigate }: CreateDonationScree
         </div>
 
         <div className="space-y-3">
-          <Button variant="primary" size="lg" fullWidth onClick={handlePublish}>
+          {errorMessage && (
+            <p className="text-sm text-[var(--app-danger)]">{errorMessage}</p>
+          )}
+          <Button variant="primary" size="lg" fullWidth onClick={handlePublish} disabled={isSubmitting}>
             <Check size={20} />
-            Publicar doação
+            {isSubmitting ? 'Publicando...' : 'Publicar doação'}
           </Button>
           <Button variant="outline" size="lg" fullWidth onClick={() => setStep(3)}>
             Voltar

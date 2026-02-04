@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Search, Store, MapPin, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { PatinhaCoin } from '../ui/PatinhaCoin';
 import { CouponCard } from '../ui/CouponCard';
-import { mockPartnersData } from '../../data/mockPartnersData';
+import { partnersApi, walletApi } from '../../api/endpoints';
+import { toUiPartner } from '../../api/mappers';
 
 interface RedeemDiscountScreenProps {
   onBack: () => void;
@@ -16,28 +17,56 @@ export function RedeemDiscountScreen({ onBack, onNavigate }: RedeemDiscountScree
   const [searchQuery, setSearchQuery] = useState('');
   const [couponGenerated, setCouponGenerated] = useState(false);
   const [generatedCoupon, setGeneratedCoupon] = useState<any>(null);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentBalance, setCurrentBalance] = useState(0);
 
-  const currentBalance = 12;
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [wallet, partnerResponse] = await Promise.all([
+          walletApi.getWallet(),
+          partnersApi.list({ page: 0, size: 50 }),
+        ]);
+        setCurrentBalance(wallet.balance);
+        setPartners(partnerResponse.content.map(toUiPartner));
+      } catch {
+        setPartners([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-  const filteredPartners = mockPartnersData.filter((partner) =>
+  const filteredPartners = partners.filter((partner) =>
     partner.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleGenerateCoupon = () => {
+  const handleGenerateCoupon = async () => {
     if (!selectedPartner) return;
 
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 30);
 
-    const coupon = {
-      code: `PM${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
-      partnerName: selectedPartner.name,
-      discount: '10%',
-      validUntil: validUntil.toLocaleDateString('pt-BR'),
-    };
-
-    setGeneratedCoupon(coupon);
-    setCouponGenerated(true);
+    try {
+      const coupon = await walletApi.createCoupon({
+        partnerName: selectedPartner.name,
+        discount: '10%',
+        validUntil: validUntil.toISOString(),
+      });
+      setGeneratedCoupon({
+        code: coupon.code,
+        partnerName: coupon.partnerName,
+        discount: coupon.discount,
+        validUntil: new Date(coupon.validUntil).toLocaleDateString('pt-BR'),
+      });
+      setCouponGenerated(true);
+      setCurrentBalance((prev) => Math.max(0, prev - 1));
+    } catch {
+      alert('Não foi possível gerar o cupom.');
+    }
   };
 
   if (couponGenerated && generatedCoupon) {
@@ -251,7 +280,11 @@ export function RedeemDiscountScreen({ onBack, onNavigate }: RedeemDiscountScree
           </h2>
 
           <div className="space-y-3">
-            {filteredPartners.map((partner) => (
+            {isLoading ? (
+              <Card className="p-4 text-center">
+                <p className="text-sm text-[var(--app-gray-500)]">Carregando parceiros...</p>
+              </Card>
+            ) : filteredPartners.map((partner) => (
               <Card
                 key={partner.id}
                 onClick={() => setSelectedPartner(partner)}

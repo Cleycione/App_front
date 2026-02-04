@@ -4,10 +4,10 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { HealthChip } from '../ui/HealthChip';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import type { Donation } from '../../data/mockDonationsData';
+import type { DonationUi } from '../../types/ui';
 
 interface DonationDetailsScreenProps {
-  donation: Donation;
+  donation: DonationUi;
   onBack: () => void;
   onNavigate: (screen: string, data?: any) => void;
 }

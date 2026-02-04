@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ArrowLeft, User, MapPin, CreditCard, Briefcase, Phone, Mail, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { authApi, usersApi } from '../../api/endpoints';
+import { userStore } from '../../api/userStore';
 
 interface SignupScreenProps {
   onNavigate: (screen: string) => void;
@@ -21,6 +23,8 @@ export function SignupScreen({ onNavigate }: SignupScreenProps) {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const validateCPF = (cpf: string) => {
     const cleaned = cpf.replace(/\D/g, '');
@@ -28,9 +32,10 @@ export function SignupScreen({ onNavigate }: SignupScreenProps) {
     return true; // Simplified validation
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
+    setErrorMessage('');
 
     if (!formData.name) newErrors.name = 'Nome é obrigatório';
     if (!formData.address) newErrors.address = 'Endereço é obrigatório';
@@ -55,8 +60,29 @@ export function SignupScreen({ onNavigate }: SignupScreenProps) {
       return;
     }
 
-    // Mock signup - navigate to home
-    onNavigate('home');
+    setIsSubmitting(true);
+    try {
+      await authApi.signup({
+        name: formData.name,
+        address: formData.address,
+        cpf: formData.cpf,
+        profession: formData.profession,
+        phone: formData.phone,
+        email: formData.email,
+        password: formData.password,
+      });
+      try {
+        const me = await usersApi.getMe();
+        userStore.set(me);
+      } catch {
+        // Falha ao buscar perfil não deve bloquear o cadastro.
+      }
+      onNavigate('home');
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao criar conta. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field: string, value: string | boolean) => {
@@ -194,9 +220,13 @@ export function SignupScreen({ onNavigate }: SignupScreenProps) {
               <p className="text-sm text-[var(--app-danger)]">{errors.terms}</p>
             )}
 
-            <Button type="submit" variant="primary" size="lg" fullWidth>
+            {errorMessage && (
+              <p className="text-sm text-[var(--app-danger)]">{errorMessage}</p>
+            )}
+
+            <Button type="submit" variant="primary" size="lg" fullWidth disabled={isSubmitting}>
               <CheckCircle size={20} />
-              Criar conta
+              {isSubmitting ? 'Criando...' : 'Criar conta'}
             </Button>
 
             <div className="text-center">

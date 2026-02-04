@@ -1,30 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Camera, MapPin, Calendar, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
+import { petsApi } from '../../api/endpoints';
 
 interface ReportLostPetScreenProps {
   onBack: () => void;
   onNavigate: (screen: string, data?: any) => void;
 }
-
-const mockPets = [
-  {
-    id: '1',
-    name: 'Thor',
-    species: 'Cachorro',
-    breed: 'Golden Retriever',
-    photo: 'https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=400',
-  },
-  {
-    id: '2',
-    name: 'Luna',
-    species: 'Gata',
-    breed: 'Siamês',
-    photo: 'https://images.unsplash.com/photo-1573865526739-10c1dd7aa5d0?w=400',
-  },
-];
 
 export function ReportLostPetScreen({ onBack, onNavigate }: ReportLostPetScreenProps) {
   const [step, setStep] = useState(1);
@@ -36,6 +20,23 @@ export function ReportLostPetScreen({ onBack, onNavigate }: ReportLostPetScreenP
     date: '',
     time: '',
   });
+  const [pets, setPets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPets = async () => {
+      setIsLoading(true);
+      try {
+        const response = await petsApi.list();
+        setPets(response.content.map((pet) => ({ ...pet, photo: pet.photoUrl })));
+      } catch {
+        setPets([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPets();
+  }, []);
 
   const handlePhotoUpload = () => {
     setPhoto('https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=400');
@@ -83,7 +84,11 @@ export function ReportLostPetScreen({ onBack, onNavigate }: ReportLostPetScreenP
           </h2>
 
           <div className="space-y-3">
-            {mockPets.map((pet) => (
+            {isLoading ? (
+              <Card className="p-6 text-center">
+                <p className="text-[var(--app-gray-500)]">Carregando pets...</p>
+              </Card>
+            ) : pets.map((pet) => (
               <Card
                 key={pet.id}
                 onClick={() => {

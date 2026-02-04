@@ -3,6 +3,7 @@ import { ArrowLeft, Camera, Upload, MapPin, Navigation, CheckCircle, AlertCircle
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { postsApi, uploadsApi } from '../../api/endpoints';
 
 interface RegisterAnimalScreenProps {
   onNavigate: (screen: string) => void;
@@ -12,6 +13,7 @@ export function RegisterAnimalScreen({ onNavigate }: RegisterAnimalScreenProps) 
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     photo: null as string | null,
+    photoFile: null as File | null,
     location: 'Jardim Paulista, São Paulo - SP',
     locationDetails: '',
     occurrenceType: 'found' as 'found' | 'lost',
@@ -26,21 +28,78 @@ export function RegisterAnimalScreen({ onNavigate }: RegisterAnimalScreenProps) 
     contactPhone: '',
     additionalInfo: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, photo: reader.result as string }));
+        setFormData(prev => ({ ...prev, photo: reader.result as string, photoFile: file }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = () => {
-    alert('Animal registrado com sucesso!');
-    onNavigate('home');
+  const handleSubmit = async () => {
+    if (!formData.photoFile) return;
+    setIsSubmitting(true);
+    setErrorMessage('');
+    try {
+      const locationParts = formData.location.split('-');
+      const state = locationParts.length > 1 ? locationParts[1].trim() : '';
+      const cityNeighborhood = locationParts[0].split(',');
+      const neighborhood = cityNeighborhood[0]?.trim() ?? '';
+      const city = cityNeighborhood[1]?.trim() ?? '';
+
+      if (!neighborhood || !city || !state) {
+        setErrorMessage('Informe o bairro, cidade e estado no formato "Bairro, Cidade - UF".');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const upload = await uploadsApi.upload(formData.photoFile);
+      const speciesMap: Record<string, string> = {
+        dog: 'Cachorro',
+        cat: 'Gato',
+        other: 'Outro',
+      };
+      const sizeMap: Record<string, string> = {
+        small: 'Pequeno',
+        medium: 'Médio',
+        large: 'Grande',
+      };
+
+      await postsApi.create({
+        status: formData.occurrenceType === 'lost' ? 'LOST' : 'FOUND',
+        photos: [upload.url],
+        neighborhood,
+        city,
+        state,
+        latitude: -23.5615,
+        longitude: -46.6559,
+        occurredAt: new Date().toISOString(),
+        species: speciesMap[formData.species] ?? formData.species,
+        size: sizeMap[formData.size] ?? formData.size,
+        color: formData.color,
+        characteristics: formData.characteristics,
+        observations: formData.additionalInfo,
+        hasCollar: formData.hasCollar === 'yes',
+        injured: formData.isInjured === 'yes',
+        injuryDetails: formData.injuryDetails,
+        contactAddress: formData.contactAddress,
+        contactPhone: formData.contactPhone,
+        occurrenceType: formData.occurrenceType === 'lost' ? 'LOST' : 'FOUND',
+      });
+
+      alert('Animal registrado com sucesso!');
+      onNavigate('home');
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao registrar animal.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const steps = [
@@ -539,10 +598,14 @@ export function RegisterAnimalScreen({ onNavigate }: RegisterAnimalScreenProps) 
                 size="lg"
                 fullWidth
                 onClick={handleSubmit}
+                disabled={isSubmitting}
               >
                 <CheckCircle size={20} />
-                Publicar
+                {isSubmitting ? 'Publicando...' : 'Publicar'}
               </Button>
+              {errorMessage && (
+                <p className="text-sm text-[var(--app-danger)] mt-2">{errorMessage}</p>
+              )}
             </div>
           </div>
         )}

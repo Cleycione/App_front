@@ -7,6 +7,7 @@ export const mockPosts: Post[] = [
     status: 'lost',
     location: 'Jardim Paulista, São Paulo',
     distance: '0.8 km',
+    distanceKm: 0.8,
     date: 'Há 2 horas',
     animal: {
       species: 'Cão',
@@ -21,6 +22,7 @@ export const mockPosts: Post[] = [
     status: 'found',
     location: 'Vila Madalena, São Paulo',
     distance: '1.2 km',
+    distanceKm: 1.2,
     date: 'Há 5 horas',
     animal: {
       species: 'Gato',
@@ -34,6 +36,7 @@ export const mockPosts: Post[] = [
     status: 'care',
     location: 'Pinheiros, São Paulo',
     distance: '2.5 km',
+    distanceKm: 2.5,
     date: 'Há 1 dia',
     animal: {
       species: 'Cão',
@@ -47,6 +50,7 @@ export const mockPosts: Post[] = [
     status: 'found',
     location: 'Moema, São Paulo',
     distance: '3.1 km',
+    distanceKm: 3.1,
     date: 'Há 3 dias',
     animal: {
       species: 'Cão',
@@ -60,6 +64,7 @@ export const mockPosts: Post[] = [
     status: 'lost',
     location: 'Itaim Bibi, São Paulo',
     distance: '4.2 km',
+    distanceKm: 4.2,
     date: 'Há 2 dias',
     animal: {
       species: 'Cão',

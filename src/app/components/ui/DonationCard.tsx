@@ -3,10 +3,10 @@ import { MapPin, Heart } from 'lucide-react';
 import { Card } from './Card';
 import { HealthChip } from './HealthChip';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import type { Donation } from '../../data/mockDonationsData';
+import type { DonationUi } from '../../types/ui';
 
 interface DonationCardProps {
-  donation: Donation;
+  donation: DonationUi;
   onClick?: () => void;
   showNewBadge?: boolean;
 }

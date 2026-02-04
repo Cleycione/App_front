@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Heart, Pause, Play, CheckCircle, Edit, Home } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { mockDonations } from '../../data/mockDonationsData';
+import { donationsApi } from '../../api/endpoints';
+import { toUiDonation } from '../../api/mappers';
+import type { DonationUi } from '../../types/ui';
 
 interface MyDonationsScreenProps {
   onBack: () => void;
@@ -11,8 +13,23 @@ interface MyDonationsScreenProps {
 }
 
 export function MyDonationsScreen({ onBack, onNavigate }: MyDonationsScreenProps) {
-  // Filter to show only donations from current user (mock: show first 2)
-  const myDonations = mockDonations.slice(0, 2);
+  const [myDonations, setMyDonations] = useState<DonationUi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDonations = async () => {
+      setIsLoading(true);
+      try {
+        const response = await donationsApi.list({ page: 0, size: 50 });
+        setMyDonations(response.content.map(toUiDonation));
+      } catch {
+        setMyDonations([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDonations();
+  }, []);
   const activeDonations = myDonations.filter(d => d.status === 'active');
   const pausedDonations = myDonations.filter(d => d.status === 'paused');
   const completedDonations = myDonations.filter(d => d.status === 'completed');
@@ -35,7 +52,7 @@ export function MyDonationsScreen({ onBack, onNavigate }: MyDonationsScreenProps
     }
   };
 
-  const renderDonationCard = (donation: any) => (
+  const renderDonationCard = (donation: DonationUi) => (
     <Card key={donation.id} className="p-4">
       <div className="flex gap-4">
         <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-[var(--app-gray-100)]">
@@ -158,6 +175,11 @@ export function MyDonationsScreen({ onBack, onNavigate }: MyDonationsScreenProps
         </Button>
 
         {/* Active Donations */}
+        {isLoading && (
+          <Card className="p-6 text-center">
+            <p className="text-[var(--app-gray-500)]">Carregando doações...</p>
+          </Card>
+        )}
         {activeDonations.length > 0 && (
           <div>
             <h2 className="text-[var(--app-gray-900)] mb-4">

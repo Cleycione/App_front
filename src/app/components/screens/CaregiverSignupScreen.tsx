@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { PhotoGalleryUpload } from '../ui/PhotoGalleryUpload';
+import { usersApi } from '../../api/endpoints';
 
 interface CaregiverSignupScreenProps {
   onBack: () => void;
@@ -9,10 +10,10 @@ interface CaregiverSignupScreenProps {
 
 export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScreenProps) {
   const [formData, setFormData] = useState({
-    name: 'João Silva',
-    phone: '(11) 98765-4321',
-    email: 'joao.silva@email.com',
-    address: 'Rua das Flores, 123 - Jardins',
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
     experience: '',
     petsAccepted: [] as string[],
     sizesAccepted: [] as string[],
@@ -23,6 +24,31 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
   
   const [photos, setPhotos] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        const me = await usersApi.getMe();
+        setFormData((prev) => ({
+          ...prev,
+          name: me.name ?? '',
+          phone: me.phone ?? '',
+          email: me.email ?? '',
+          address: me.address ?? '',
+        }));
+      } catch (error: any) {
+        setErrorMessage(error?.message ?? 'Não foi possível carregar seus dados.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadUser();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,9 +110,25 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
       <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-24">
         {/* Personal Info */}
         <div className="bg-white rounded-xl p-4 space-y-4">
-          <h2 className="font-semibold text-[var(--petmatch-text)] mb-3">
-            Informações Pessoais
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-[var(--petmatch-text)]">
+              Informações Pessoais
+            </h2>
+            <button
+              type="button"
+              onClick={() => setIsEditing((prev) => !prev)}
+              className="text-sm text-[var(--petmatch-primary)] font-medium"
+            >
+              {isEditing ? 'Bloquear edição' : 'Editar'}
+            </button>
+          </div>
+
+          {isLoading && (
+            <p className="text-sm text-[var(--petmatch-text-muted)]">Carregando dados...</p>
+          )}
+          {!isLoading && errorMessage && (
+            <p className="text-sm text-red-600">{errorMessage}</p>
+          )}
           
           <div>
             <label className="block text-sm font-medium mb-2">Nome completo</label>
@@ -95,6 +137,7 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
               className="w-full px-4 py-2 border border-[var(--petmatch-border)] rounded-lg"
+              disabled={!isEditing}
               required
             />
           </div>
@@ -107,6 +150,7 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
                 className="w-full px-4 py-2 border border-[var(--petmatch-border)] rounded-lg"
+                disabled={!isEditing}
                 required
               />
             </div>
@@ -117,6 +161,7 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                 className="w-full px-4 py-2 border border-[var(--petmatch-border)] rounded-lg"
+                disabled={!isEditing}
                 required
               />
             </div>
@@ -131,6 +176,7 @@ export function CaregiverSignupScreen({ onBack, onNavigate }: CaregiverSignupScr
               value={formData.address}
               onChange={(e) => setFormData({...formData, address: e.target.value})}
               className="w-full px-4 py-2 border border-[var(--petmatch-border)] rounded-lg"
+              disabled={!isEditing}
               required
             />
           </div>

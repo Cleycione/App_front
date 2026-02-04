@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigation, Filter } from 'lucide-react';
 import { PostCard } from '../PostCard';
-import { mockPosts } from '../../data/mockPosts';
-import { Button } from '../ui/Button';
+import { mapApi } from '../../api/endpoints';
+import { toUiPost } from '../../api/mappers';
 
 interface MapScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -11,6 +11,8 @@ interface MapScreenProps {
 export function MapScreen({ onNavigate }: MapScreenProps) {
   const [selectedPin, setSelectedPin] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const filterOptions = [
     { id: 'lost', label: 'Perdido', color: 'var(--status-lost)' },
@@ -26,17 +28,34 @@ export function MapScreen({ onNavigate }: MapScreenProps) {
     );
   };
 
-  const filteredPosts = mockPosts.filter(post => {
-    if (activeFilters.length > 0 && !activeFilters.includes(post.status)) {
-      return false;
-    }
-    return true;
-  });
+  const statusFilter = activeFilters.length > 0 ? activeFilters.map((status) => status.toUpperCase()).join(',') : undefined;
 
-  const selectedPost = selectedPin ? filteredPosts.find(p => p.id === selectedPin) : null;
+  useEffect(() => {
+    const fetchMapPosts = async () => {
+      setIsLoading(true);
+      try {
+        const response = await mapApi.posts({
+          page: 0,
+          size: 50,
+          radiusKm: 20,
+          lat: -23.5615,
+          lng: -46.6559,
+          status: statusFilter,
+        });
+        setPosts(response.content.map(toUiPost));
+      } catch {
+        setPosts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMapPosts();
+  }, [statusFilter]);
+
+  const selectedPost = selectedPin ? posts.find(p => p.id === selectedPin) : null;
 
   // Mock map coordinates for pins
-  const pins = filteredPosts.map((post, index) => ({
+  const pins = posts.map((post, index) => ({
     id: post.id,
     top: 20 + (index * 15) + Math.random() * 10,
     left: 15 + (index * 20) + Math.random() * 15,
@@ -102,7 +121,7 @@ export function MapScreen({ onNavigate }: MapScreenProps) {
           </button>
 
           {/* Pins */}
-          {pins.map(pin => {
+          {isLoading ? null : pins.map(pin => {
             const isSelected = selectedPin === pin.id;
             const pinColors = {
               lost: 'var(--status-lost)',

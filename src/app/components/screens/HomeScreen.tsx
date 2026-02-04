@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, PlusCircle, Heart, Settings } from 'lucide-react';
 import { PostCard } from '../PostCard';
 import { Card } from '../ui/Card';
-import { mockPosts } from '../../data/mockPosts';
+import { mapApi, postsApi } from '../../api/endpoints';
+import { tokenStore } from '../../api/client';
+import { toUiPost } from '../../api/mappers';
 
 interface HomeScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -12,6 +14,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [radiusFilter, setRadiusFilter] = useState('5km');
+  const [posts, setPosts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const filterOptions = [
     { id: 'lost', label: 'Perdido' },
@@ -31,20 +36,79 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     );
   };
 
-  const filteredPosts = mockPosts.filter(post => {
-    if (activeFilters.length > 0 && !activeFilters.includes(post.status)) {
-      return false;
+  const radiusKm = useMemo(() => Number(radiusFilter.replace('km', '')), [radiusFilter]);
+  const statusFilter = activeFilters.length > 0 ? activeFilters.map((status) => status.toUpperCase()) : undefined;
+  const statusParam = statusFilter?.join(',');
+  const visiblePosts = useMemo(() => {
+    let filtered = posts;
+    if (activeFilters.length > 0) {
+      filtered = filtered.filter((post) => activeFilters.includes(post.status));
     }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        post.location.toLowerCase().includes(query) ||
-        post.animal.species.toLowerCase().includes(query) ||
-        post.animal.color.toLowerCase().includes(query)
-      );
+    if (!Number.isNaN(radiusKm)) {
+      filtered = filtered.filter((post) => {
+        if (typeof post.distanceKm !== 'number') {
+          return true;
+        }
+        return post.distanceKm <= radiusKm;
+      });
     }
-    return true;
-  });
+    return filtered;
+  }, [posts, activeFilters, radiusKm]);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        const hasToken = Boolean(tokenStore.getAccessToken());
+        const params = {
+          page: 0,
+          size: 50,
+          radiusKm,
+          query: searchQuery || undefined,
+          lat: -23.5615,
+          lng: -46.6559,
+          status: statusParam,
+        };
+
+        if (hasToken) {
+          const response = await postsApi.list(params, { auth: true, skipRefresh: true });
+          setPosts(response.content.map(toUiPost));
+        } else {
+          const response = await mapApi.posts(params, { auth: false, skipRefresh: true });
+          setPosts(response.content.map(toUiPost));
+        }
+      } catch (error: any) {
+        if (error?.status === 401) {
+          try {
+            const response = await mapApi.posts(
+              {
+                page: 0,
+                size: 50,
+                radiusKm,
+                query: searchQuery || undefined,
+                lat: -23.5615,
+                lng: -46.6559,
+                status: statusParam,
+              },
+              { auth: false, skipRefresh: true },
+            );
+            setPosts(response.content.map(toUiPost));
+            setErrorMessage('');
+          } catch {
+            setErrorMessage('');
+            setPosts([]);
+          }
+        } else {
+          setErrorMessage(error?.message ?? 'Falha ao carregar posts.');
+          setPosts([]);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPosts();
+  }, [radiusKm, searchQuery, statusParam]);
 
   return (
     <div className="min-h-screen bg-[var(--app-gray-50)] pb-24">
@@ -148,8 +212,15 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
         {/* Posts Feed */}
         <div className="space-y-4">
-          {filteredPosts.length === 0 ? (
+          {isLoading ? (
             <div className="text-center py-12">
+              <p className="text-[var(--app-gray-500)]">Carregando posts...</p>
+            </div>
+          ) : visiblePosts.length === 0 ? (
+            <div className="text-center py-12">
+              {errorMessage && (
+                <p className="text-[var(--app-danger)] mb-2">{errorMessage}</p>
+              )}
               <p className="text-[var(--app-gray-500)] mb-4">
                 Nenhum animal encontrado com esses filtros
               </p>
@@ -161,7 +232,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               </button>
             </div>
           ) : (
-            filteredPosts.map(post => (
+            visiblePosts.map(post => (
               <PostCard
                 key={post.id}
                 post={post}

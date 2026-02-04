@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Post } from '../PostCard';
+import { postsApi, uploadsApi } from '../../api/endpoints';
 
 interface OwnerClaimScreenProps {
   post: Post;
@@ -17,25 +18,48 @@ export function OwnerClaimScreen({ post, onBack, onNavigate }: OwnerClaimScreenP
     characteristics: '',
     lastSeen: '',
     proof: null as string | null,
+    proofFile: null as File | null,
     additionalInfo: '',
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, proof: reader.result as string }));
+        setFormData(prev => ({ ...prev, proof: reader.result as string, proofFile: file }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setErrorMessage('');
+    try {
+      let proofPhotoUrl: string | undefined;
+      if (formData.proofFile) {
+        const upload = await uploadsApi.upload(formData.proofFile);
+        proofPhotoUrl = upload.url;
+      }
+      await postsApi.createClaim(post.id, {
+        animalName: formData.petName,
+        specificCharacteristics: formData.characteristics,
+        lastSeenInfo: formData.lastSeen,
+        proofPhotoUrl,
+        additionalInfo: formData.additionalInfo || undefined,
+      });
+      setSubmitted(true);
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao enviar solicitação.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -216,6 +240,10 @@ export function OwnerClaimScreen({ post, onBack, onNavigate }: OwnerClaimScreenP
             rows={3}
           />
 
+          {errorMessage && (
+            <p className="text-sm text-[var(--app-danger)]">{errorMessage}</p>
+          )}
+
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800">
               💡 <strong>Dica:</strong> Quanto mais detalhes específicos você fornecer, mais rápido será o processo de verificação.
@@ -227,10 +255,10 @@ export function OwnerClaimScreen({ post, onBack, onNavigate }: OwnerClaimScreenP
             variant="primary"
             size="lg"
             fullWidth
-            disabled={!formData.petName || !formData.characteristics || !formData.lastSeen}
+            disabled={!formData.petName || !formData.characteristics || !formData.lastSeen || isSubmitting}
           >
             <CheckCircle size={20} />
-            Enviar Solicitação
+            {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
           </Button>
         </form>
       </div>

@@ -10,6 +10,7 @@ export interface Post {
   status: 'lost' | 'found' | 'care' | 'resolved' | 'urgent';
   location: string;
   distance: string;
+  distanceKm?: number;
   date: string;
   animal: {
     species: string;

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowLeft, Camera, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { petsApi, uploadsApi } from '../../api/endpoints';
 
 interface PetRegistrationScreenProps {
   onBack: () => void;
@@ -24,8 +25,12 @@ export function PetRegistrationScreen({ onBack, onNavigate }: PetRegistrationScr
   });
 
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.species || !formData.size || !formData.color) {
@@ -33,17 +38,39 @@ export function PetRegistrationScreen({ onBack, onNavigate }: PetRegistrationScr
       return;
     }
 
-    alert('Pet cadastrado com sucesso!');
-    onBack();
+    setIsSubmitting(true);
+    setErrorMessage('');
+    try {
+      const uploads = await Promise.all(photoFiles.map((file) => uploadsApi.upload(file)));
+      const uploadedUrls = uploads.map((u) => u.url);
+      await petsApi.create({
+        name: formData.name,
+        species: formData.species,
+        breed: formData.breed || undefined,
+        size: formData.size,
+        color: formData.color,
+        age: formData.age || undefined,
+        photoUrl: uploadedUrls[0],
+      });
+      alert('Pet cadastrado com sucesso!');
+      onBack();
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao cadastrar pet.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePhotoUpload = () => {
-    // Simulate photo upload
-    const mockPhotos = [
-      'https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=400',
-      'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400',
-    ];
-    setPhotos([...photos, mockPhotos[photos.length % mockPhotos.length]]);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setPhotos((prev) => [...prev, previewUrl]);
+    setPhotoFiles((prev) => [...prev, file]);
   };
 
   return (
@@ -97,6 +124,13 @@ export function PetRegistrationScreen({ onBack, onNavigate }: PetRegistrationScr
               </button>
             )}
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
           <p className="text-xs text-[var(--app-gray-500)] mt-2">
             Você pode adicionar até 5 fotos
           </p>
@@ -259,13 +293,16 @@ export function PetRegistrationScreen({ onBack, onNavigate }: PetRegistrationScr
 
         {/* Actions */}
         <div className="space-y-3">
-          <Button type="submit" variant="primary" size="lg" fullWidth>
+          <Button type="submit" variant="primary" size="lg" fullWidth disabled={isSubmitting}>
             <Check size={20} />
-            Salvar pet
+            {isSubmitting ? 'Salvando...' : 'Salvar pet'}
           </Button>
           <Button type="button" variant="outline" size="lg" fullWidth onClick={onBack}>
             Cancelar
           </Button>
+          {errorMessage && (
+            <p className="text-sm text-[var(--app-danger)]">{errorMessage}</p>
+          )}
         </div>
 
         {/* Required Fields Notice */}

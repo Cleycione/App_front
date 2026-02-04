@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, SlidersHorizontal, Heart, Home as HomeIcon } from 'lucide-react';
 import { DonationCard } from '../ui/DonationCard';
-import { mockDonations } from '../../data/mockDonationsData';
+import { donationsApi } from '../../api/endpoints';
+import { toUiDonation } from '../../api/mappers';
+import type { DonationUi } from '../../types/ui';
 
 interface DonationListScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -13,25 +15,36 @@ export function DonationListScreen({ onNavigate }: DonationListScreenProps) {
   const [selectedSize, setSelectedSize] = useState<string>('all');
   const [selectedAge, setSelectedAge] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [donations, setDonations] = useState<DonationUi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const filteredDonations = mockDonations.filter((donation) => {
-    const matchesSearch =
-      donation.petName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      donation.species.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      donation.location.neighborhood.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    const fetchDonations = async () => {
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        const response = await donationsApi.list({
+          page: 0,
+          size: 20,
+          species: selectedSpecies === 'all' ? undefined : selectedSpecies,
+          size: selectedSize === 'all' ? undefined : selectedSize,
+          ageRange: selectedAge === 'all' ? undefined : selectedAge,
+          query: searchQuery || undefined,
+          status: 'ACTIVE',
+        });
+        setDonations(response.content.map(toUiDonation));
+      } catch (error: any) {
+        setErrorMessage(error?.message ?? 'Falha ao carregar doações.');
+        setDonations([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDonations();
+  }, [searchQuery, selectedSpecies, selectedSize, selectedAge]);
 
-    const matchesSpecies = selectedSpecies === 'all' || donation.species === selectedSpecies;
-    const matchesSize = selectedSize === 'all' || donation.size === selectedSize;
-    const matchesAge = selectedAge === 'all' || donation.ageRange === selectedAge;
-
-    return (
-      donation.status === 'active' &&
-      matchesSearch &&
-      matchesSpecies &&
-      matchesSize &&
-      matchesAge
-    );
-  });
+  const filteredDonations = donations;
 
   const activeFiltersCount = [selectedSpecies, selectedSize, selectedAge].filter(
     (f) => f !== 'all'
@@ -178,11 +191,18 @@ export function DonationListScreen({ onNavigate }: DonationListScreenProps) {
 
         {/* Donations List */}
         <div className="space-y-4">
-          {filteredDonations.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-[var(--app-gray-500)]">Carregando doações...</p>
+            </div>
+          ) : filteredDonations.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Heart size={40} className="text-pink-500" />
               </div>
+              {errorMessage && (
+                <p className="text-sm text-[var(--app-danger)] mb-2">{errorMessage}</p>
+              )}
               <p className="text-[var(--app-gray-500)] mb-2">
                 Nenhum pet para doação na sua região
               </p>

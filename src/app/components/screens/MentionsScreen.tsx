@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { Card } from '../ui/Card';
+import { communityApi } from '../../api/endpoints';
 
 interface MentionsScreenProps {
   onBack: () => void;
@@ -16,43 +17,34 @@ interface Mention {
   isRead: boolean;
 }
 
-const mockMentions: Mention[] = [
-  {
-    id: '1',
-    userName: 'Maria Silva',
-    userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    message: '@João Silva Obrigada pela ajuda! Consegui encontrar meu pet graças às suas dicas.',
-    timestamp: 'Há 2 horas',
-    isRead: false,
-  },
-  {
-    id: '2',
-    userName: 'Ana Costa',
-    userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    message: '@João Silva Você poderia me ajudar a identificar a raça desse cachorro que encontrei?',
-    timestamp: 'Há 5 horas',
-    isRead: false,
-  },
-  {
-    id: '3',
-    userName: 'Carlos Oliveira',
-    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    message: '@João Silva Vi que você é veterinário. Tem alguma dica para cuidados com gatos resgatados?',
-    timestamp: 'Há 1 dia',
-    isRead: true,
-  },
-  {
-    id: '4',
-    userName: 'Beatriz Santos',
-    userAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100',
-    message: '@João Silva Parabéns por devolver aquele golden retriever! Você é incrível! 🎉',
-    timestamp: 'Há 2 dias',
-    isRead: true,
-  },
-];
-
 export function MentionsScreen({ onBack, onNavigate }: MentionsScreenProps) {
-  const unreadCount = mockMentions.filter(m => !m.isRead).length;
+  const [mentions, setMentions] = useState<Mention[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMentions = async () => {
+      setIsLoading(true);
+      try {
+        const response = await communityApi.listMentions();
+        const mapped = response.content.map((item) => ({
+          id: item.id,
+          userName: item.userName,
+          userAvatar: item.userAvatar,
+          message: item.message,
+          timestamp: item.timestamp,
+          isRead: false,
+        }));
+        setMentions(mapped);
+      } catch {
+        setMentions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMentions();
+  }, []);
+
+  const unreadCount = mentions.filter(m => !m.isRead).length;
 
   const handleMentionClick = (mention: Mention) => {
     // In a real app, this would navigate to the specific message in the chat
@@ -88,7 +80,12 @@ export function MentionsScreen({ onBack, onNavigate }: MentionsScreenProps) {
       </div>
 
       <div className="px-4 py-6 space-y-3">
-        {mockMentions.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <MessageCircle size={48} className="text-[var(--app-gray-300)] mx-auto mb-4" />
+            <p className="text-[var(--app-gray-500)]">Carregando menções...</p>
+          </div>
+        ) : mentions.length === 0 ? (
           <div className="text-center py-12">
             <MessageCircle size={48} className="text-[var(--app-gray-300)] mx-auto mb-4" />
             <p className="text-[var(--app-gray-500)]">
@@ -107,7 +104,7 @@ export function MentionsScreen({ onBack, onNavigate }: MentionsScreenProps) {
                   Não lidas
                 </h2>
                 <div className="space-y-3">
-                  {mockMentions
+                  {mentions
                     .filter(m => !m.isRead)
                     .map(mention => (
                       <Card
@@ -154,13 +151,13 @@ export function MentionsScreen({ onBack, onNavigate }: MentionsScreenProps) {
             )}
 
             {/* Read Mentions */}
-            {mockMentions.some(m => m.isRead) && (
+            {mentions.some(m => m.isRead) && (
               <div>
                 <h2 className="text-sm text-[var(--app-gray-500)] mb-3 px-1">
                   Anteriores
                 </h2>
                 <div className="space-y-3">
-                  {mockMentions
+                  {mentions
                     .filter(m => m.isRead)
                     .map(mention => (
                       <Card

@@ -1,21 +1,141 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, MapPin, CreditCard, Briefcase, Phone, Mail, Edit, LogOut, PawPrint, Gift, Sparkles, Heart, Settings } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Input } from '../ui/Input';
 import { PostCard } from '../PostCard';
 import { PatinhaCoin } from '../ui/PatinhaCoin';
-import { mockPosts } from '../../data/mockPosts';
+import { authApi, donationsApi, postsApi, usersApi, walletApi, petsApi } from '../../api/endpoints';
+import { toUiPost } from '../../api/mappers';
+import { userStore } from '../../api/userStore';
 
 interface ProfileScreenProps {
   onNavigate: (screen: string, data?: any) => void;
 }
 
 export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
-  const userPosts = mockPosts.slice(0, 2);
-  const careAnimals = mockPosts.slice(2, 3);
-  const patinhasBalance = 12;
-  const myPetsCount = 3;
-  const myDonationsCount = 2;
+  const [user, setUser] = useState<any>(() => userStore.get());
+  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [patinhasBalance, setPatinhasBalance] = useState(0);
+  const [myPetsCount, setMyPetsCount] = useState(0);
+  const [myDonationsCount, setMyDonationsCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [draft, setDraft] = useState({
+    name: '',
+    address: '',
+    profession: '',
+    phone: '',
+    email: '',
+  });
+  const careAnimals = userPosts.slice(2, 3);
+
+  useEffect(() => {
+    if (!user) return;
+    setDraft({
+      name: user.name ?? '',
+      address: user.address ?? '',
+      profession: user.profession ?? '',
+      phone: user.phone ?? '',
+      email: user.email ?? '',
+    });
+  }, [user]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        const me = await usersApi.getMe();
+        setUser(me);
+        userStore.set(me);
+      } catch (error: any) {
+        if (error?.status === 401) {
+          if (!user) {
+            setErrorMessage('Sua sessão expirou. Faça login novamente.');
+          }
+          setIsLoading(false);
+          return;
+        }
+        setErrorMessage(error?.message ?? 'Falha ao carregar seu perfil.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const [posts, wallet, pets, donations] = await Promise.allSettled([
+          postsApi.list(
+            { page: 0, size: 5, radiusKm: 5, lat: -23.5615, lng: -46.6559 },
+            { auth: true, skipRefresh: true },
+          ),
+          walletApi.getWallet(),
+          petsApi.list(),
+          donationsApi.list({ page: 0, size: 10 }),
+        ]);
+
+        if (posts.status === 'fulfilled') {
+          setUserPosts(posts.value.content.map(toUiPost));
+        }
+        if (wallet.status === 'fulfilled') {
+          setPatinhasBalance(wallet.value.balance);
+        }
+        if (pets.status === 'fulfilled') {
+          setMyPetsCount(pets.value.totalElements);
+        }
+        if (donations.status === 'fulfilled') {
+          setMyDonationsCount(donations.value.totalElements);
+        }
+      } catch {
+        // Ignore secondary errors to keep profile visible.
+      }
+      setIsLoading(false);
+    };
+    fetchProfile();
+  }, []);
+
+  const handleStartEdit = () => {
+    if (!user) return;
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (user) {
+      setDraft({
+        name: user.name ?? '',
+        address: user.address ?? '',
+        profession: user.profession ?? '',
+        phone: user.phone ?? '',
+        email: user.email ?? '',
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    setErrorMessage('');
+    try {
+      const payload = {
+        name: draft.name.trim(),
+        address: draft.address.trim() || undefined,
+        profession: draft.profession.trim() || undefined,
+        phone: draft.phone.trim() || undefined,
+        email: draft.email.trim() || undefined,
+      };
+      await usersApi.updateMe(payload);
+      const nextUser = { ...user, ...payload };
+      setUser(nextUser);
+      userStore.set(nextUser);
+      setIsEditing(false);
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao salvar suas informações.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[var(--app-gray-50)] pb-24">
@@ -27,8 +147,10 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
               <User size={40} className="text-[var(--app-primary)]" />
             </div>
             <div>
-              <h1 className="mb-1">João Silva</h1>
-              <p className="text-white/90">Membro desde 2024</p>
+              <h1 className="mb-1">{user?.name ?? 'Usuário'}</h1>
+              <p className="text-white/90">
+                {user?.createdAt ? `Membro desde ${new Date(user.createdAt).getFullYear()}` : 'Membro'}
+              </p>
             </div>
           </div>
 
@@ -50,6 +172,16 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
       </div>
 
       <div className="px-4 py-6 space-y-6 max-w-md mx-auto">
+        {(isLoading || errorMessage) && (
+          <Card className="p-4">
+            {isLoading && (
+              <p className="text-sm text-[var(--app-gray-600)]">Carregando perfil...</p>
+            )}
+            {!isLoading && errorMessage && (
+              <p className="text-sm text-[var(--app-danger)]">{errorMessage}</p>
+            )}
+          </Card>
+        )}
         {/* Patinhas Card */}
         <Card 
           onClick={() => onNavigate('patinhas-wallet')}
@@ -145,64 +277,128 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
 
         {/* Personal Info */}
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[var(--app-gray-900)]">
-              Informações Pessoais
-            </h2>
-            <button className="text-[var(--app-primary)] hover:text-[var(--app-primary-dark)]">
-              <Edit size={20} />
-            </button>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[var(--app-gray-900)]">
+            Informações Pessoais
+          </h2>
+          <button
+            className="text-[var(--app-primary)] hover:text-[var(--app-primary-dark)] disabled:opacity-40"
+            onClick={handleStartEdit}
+            disabled={!user || isEditing}
+          >
+            <Edit size={20} />
+          </button>
+        </div>
 
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <User size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">Nome completo</p>
-                <p className="text-[var(--app-gray-900)]">João Silva</p>
+          {isEditing ? (
+            <div className="space-y-4">
+              <Input
+                label="Nome completo"
+                value={draft.name}
+                onChange={(e) => setDraft(prev => ({ ...prev, name: e.target.value }))}
+                disabled={isSaving}
+              />
+              <Input
+                label="Endereço"
+                value={draft.address}
+                onChange={(e) => setDraft(prev => ({ ...prev, address: e.target.value }))}
+                disabled={isSaving}
+              />
+              <Input
+                label="CPF"
+                value={user?.cpf ?? ''}
+                disabled
+              />
+              <Input
+                label="Profissão"
+                value={draft.profession}
+                onChange={(e) => setDraft(prev => ({ ...prev, profession: e.target.value }))}
+                disabled={isSaving}
+              />
+              <Input
+                label="Telefone"
+                value={draft.phone}
+                onChange={(e) => setDraft(prev => ({ ...prev, phone: e.target.value }))}
+                disabled={isSaving}
+              />
+              <Input
+                label="E-mail"
+                type="email"
+                value={draft.email}
+                onChange={(e) => setDraft(prev => ({ ...prev, email: e.target.value }))}
+                disabled={isSaving}
+              />
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveEdit}
+                  disabled={isSaving || !draft.name.trim()}
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar'}
+                </Button>
               </div>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <User size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">Nome completo</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.name ?? '—'}</p>
+                </div>
+              </div>
 
-            <div className="flex items-start gap-3">
-              <MapPin size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">Endereço</p>
-                <p className="text-[var(--app-gray-900)]">Rua das Flores, 123 - Jardim Paulista, São Paulo - SP</p>
+              <div className="flex items-start gap-3">
+                <MapPin size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">Endereço</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.address ?? '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <CreditCard size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">CPF</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.cpf ?? '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Briefcase size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">Profissão</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.profession ?? '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Phone size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">Telefone</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.phone ?? '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Mail size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--app-gray-500)]">E-mail</p>
+                  <p className="text-[var(--app-gray-900)]">{user?.email ?? '—'}</p>
+                </div>
               </div>
             </div>
-
-            <div className="flex items-start gap-3">
-              <CreditCard size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">CPF</p>
-                <p className="text-[var(--app-gray-900)]">123.456.789-00</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Briefcase size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">Profissão</p>
-                <p className="text-[var(--app-gray-900)]">Veterinário</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Phone size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">Telefone</p>
-                <p className="text-[var(--app-gray-900)]">(11) 98765-4321</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Mail size={20} className="text-[var(--app-gray-500)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[var(--app-gray-500)]">E-mail</p>
-                <p className="text-[var(--app-gray-900)]">joao.silva@email.com</p>
-              </div>
-            </div>
-          </div>
+          )}
         </Card>
 
         {/* My Posts */}
@@ -297,7 +493,8 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
             variant="outline"
             size="lg"
             fullWidth
-            onClick={() => alert('Editar perfil')}
+            onClick={handleStartEdit}
+            disabled={!user || isEditing}
           >
             <Edit size={20} />
             Editar Perfil
@@ -309,6 +506,8 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
             fullWidth
             onClick={() => {
               if (confirm('Tem certeza que deseja sair?')) {
+                authApi.logout();
+                userStore.set(null);
                 onNavigate('welcome');
               }
             }}

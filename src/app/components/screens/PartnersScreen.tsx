@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, ArrowLeft, MapPin, Star, Truck, PlusCircle } from 'lucide-react';
-import { mockPartnersData } from '../../data/mockPartnersData';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { partnersApi } from '../../api/endpoints';
+import { toUiPartner } from '../../api/mappers';
 
 interface PartnersScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -14,17 +15,42 @@ export function PartnersScreen({ onNavigate }: PartnersScreenProps) {
     delivery: false,
     minRating: 0
   });
+  const [partners, setPartners] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredPartners = mockPartnersData.filter(partner => {
-    if (searchQuery && !partner.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !partner.location.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    if (filters.category !== 'all' && partner.category !== filters.category) return false;
-    if (filters.delivery && !partner.delivery) return false;
-    if (filters.minRating && partner.rating < filters.minRating) return false;
-    return true;
-  });
+  useEffect(() => {
+    const fetchPartners = async () => {
+      setIsLoading(true);
+      try {
+        const response = await partnersApi.list({
+          page: 0,
+          size: 50,
+          lat: -23.5615,
+          lng: -46.6559,
+          radiusKm: 20,
+        });
+        setPartners(response.content.map(toUiPartner));
+      } catch {
+        setPartners([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPartners();
+  }, []);
+
+  const filteredPartners = useMemo(() => {
+    return partners.filter(partner => {
+      if (searchQuery && !partner.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !partner.location.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      if (filters.category !== 'all' && partner.category !== filters.category) return false;
+      if (filters.delivery && !partner.delivery) return false;
+      if (filters.minRating && partner.rating < filters.minRating) return false;
+      return true;
+    });
+  }, [partners, searchQuery, filters]);
 
   return (
     <div className="min-h-screen bg-[var(--app-bg-light)] pb-20">
@@ -138,7 +164,11 @@ export function PartnersScreen({ onNavigate }: PartnersScreenProps) {
         </p>
 
         <div className="space-y-3">
-          {filteredPartners.map(partner => (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-[var(--petmatch-text-muted)]">Carregando parceiros...</p>
+            </div>
+          ) : filteredPartners.map(partner => (
             <div
               key={partner.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

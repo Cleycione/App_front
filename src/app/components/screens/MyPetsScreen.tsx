@@ -1,50 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, AlertTriangle, History, PawPrint } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { PetCard } from '../ui/PetCard';
+import { petsApi } from '../../api/endpoints';
 
 interface MyPetsScreenProps {
   onBack: () => void;
   onNavigate: (screen: string, data?: any) => void;
 }
 
-const mockPets = [
-  {
-    id: '1',
-    name: 'Thor',
-    species: 'Cachorro',
-    breed: 'Golden Retriever',
-    color: 'Dourado',
-    size: 'Grande',
-    photo: 'https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=400',
-  },
-  {
-    id: '2',
-    name: 'Luna',
-    species: 'Gata',
-    breed: 'Siamês',
-    color: 'Branco e marrom',
-    size: 'Médio',
-    photo: 'https://images.unsplash.com/photo-1573865526739-10c1dd7aa5d0?w=400',
-  },
-  {
-    id: '3',
-    name: 'Max',
-    species: 'Cachorro',
-    breed: 'Vira-lata',
-    color: 'Preto e branco',
-    size: 'Médio',
-    photo: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400',
-    isLost: true,
-    lostDate: '10/01/2026',
-    lastSeenLocation: 'Rua das Flores, Jardim Paulista',
-  },
-];
-
 export function MyPetsScreen({ onBack, onNavigate }: MyPetsScreenProps) {
-  const activePets = mockPets.filter(p => !p.isLost);
-  const lostPets = mockPets.filter(p => p.isLost);
+  const [pets, setPets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPets = async () => {
+      setIsLoading(true);
+      try {
+        const response = await petsApi.list();
+        const mapped = response.content.map((pet) => ({
+          ...pet,
+          photo: pet.photoUrl,
+        }));
+        setPets(mapped);
+      } catch {
+        setPets([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPets();
+  }, []);
+
+  const activePets = pets.filter(p => !p.isLost);
+  const lostPets = pets.filter(p => p.isLost);
 
   return (
     <div className="min-h-screen bg-[var(--app-gray-50)] pb-6">
@@ -110,6 +100,11 @@ export function MyPetsScreen({ onBack, onNavigate }: MyPetsScreenProps) {
         )}
 
         {/* Lost Pets */}
+        {isLoading && (
+          <Card className="p-6 text-center">
+            <p className="text-[var(--app-gray-500)]">Carregando pets...</p>
+          </Card>
+        )}
         {lostPets.length > 0 && (
           <div>
             <h2 className="text-[var(--app-gray-900)] mb-4">

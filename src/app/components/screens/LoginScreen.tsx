@@ -3,6 +3,8 @@ import { ArrowLeft, Mail, Lock, Shield } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { CaptchaCard } from '../CaptchaCard';
+import { authApi, usersApi } from '../../api/endpoints';
+import { userStore } from '../../api/userStore';
 
 interface LoginScreenProps {
   onNavigate: (screen: string) => void;
@@ -14,24 +16,61 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
   const [showCaptchaError, setShowCaptchaError] = useState(false);
   const [trustDevice, setTrustDevice] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const getDeviceId = () => {
+    const key = 'petmatch_device_id';
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const newId = crypto.randomUUID();
+    localStorage.setItem(key, newId);
+    return newId;
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
     
     // Verificar CAPTCHA
     if (!isCaptchaVerified) {
       setShowCaptchaError(true);
       return;
     }
+
+    setIsSubmitting(true);
     
-    // Salvar dispositivo confiável se marcado
-    if (trustDevice) {
-      localStorage.setItem('petmatch_trusted_device', 'true');
-      localStorage.setItem('petmatch_user_name', 'Cleycione');
+    try {
+      const deviceId = getDeviceId();
+      await authApi.login({
+        login: email,
+        password,
+        deviceId,
+        trusted: trustDevice,
+      });
+
+      try {
+        const me = await usersApi.getMe();
+        userStore.set(me);
+      } catch {
+        // Falha ao buscar perfil não deve bloquear o login.
+      }
+
+      if (trustDevice) {
+        localStorage.setItem('petmatch_trusted_device', 'true');
+        try {
+          await usersApi.addTrustedDevice({ deviceId, trusted: true });
+        } catch {
+          // Backend pode não ter implementado ainda.
+        }
+      }
+
+      onNavigate('home');
+    } catch (error: any) {
+      setErrorMessage(error?.message ?? 'Falha ao entrar. Verifique seus dados.');
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Mock login - navigate to home
-    onNavigate('home');
   };
 
   const handleCaptchaVerify = (verified: boolean) => {
@@ -96,6 +135,12 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
               <CaptchaCard onVerify={handleCaptchaVerify} error={showCaptchaError} />
             </div>
 
+            {errorMessage && (
+              <div className="text-sm text-[var(--app-danger)]">
+                {errorMessage}
+              </div>
+            )}
+
             {/* Checkbox confiar neste dispositivo */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
               <label className="flex items-start gap-3 cursor-pointer">
@@ -124,10 +169,10 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
               variant="primary" 
               size="lg" 
               fullWidth
-              disabled={!isCaptchaVerified}
-              className={!isCaptchaVerified ? 'opacity-50 cursor-not-allowed' : ''}
+              disabled={!isCaptchaVerified || isSubmitting}
+              className={!isCaptchaVerified || isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}
             >
-              Entrar
+              {isSubmitting ? 'Entrando...' : 'Entrar'}
             </Button>
 
             <div className="text-center">

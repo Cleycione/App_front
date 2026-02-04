@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Gift, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { PatinhaCoin } from '../ui/PatinhaCoin';
+import { walletApi } from '../../api/endpoints';
+import { toUiTransaction } from '../../api/mappers';
 
 interface PatinhasWalletScreenProps {
   onBack: () => void;
@@ -19,45 +21,33 @@ interface Transaction {
   partnerName?: string;
 }
 
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    type: 'earn',
-    description: 'Pet devolvido ao dono',
-    amount: 1,
-    date: '12/01/2026',
-    caseId: 'CASE-2024-0156',
-  },
-  {
-    id: '2',
-    type: 'redeem',
-    description: 'Cupom usado',
-    amount: 1,
-    date: '10/01/2026',
-    partnerName: 'Pet Shop Central',
-  },
-  {
-    id: '3',
-    type: 'earn',
-    description: 'Pet devolvido ao dono',
-    amount: 1,
-    date: '05/01/2026',
-    caseId: 'CASE-2024-0142',
-  },
-  {
-    id: '4',
-    type: 'earn',
-    description: 'Pet devolvido ao dono',
-    amount: 1,
-    date: '28/12/2025',
-    caseId: 'CASE-2024-0138',
-  },
-];
-
 export function PatinhasWalletScreen({ onBack, onNavigate }: PatinhasWalletScreenProps) {
-  const currentBalance = 12;
-  const totalEarned = 14;
-  const totalRedeemed = 2;
+  const [currentBalance, setCurrentBalance] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [totalRedeemed, setTotalRedeemed] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      setIsLoading(true);
+      try {
+        const [wallet, transactionResponse] = await Promise.all([
+          walletApi.getWallet(),
+          walletApi.listTransactions({ page: 0, size: 50 }),
+        ]);
+        setCurrentBalance(wallet.balance);
+        setTotalEarned(wallet.totalEarned);
+        setTotalRedeemed(wallet.totalRedeemed);
+        setTransactions(transactionResponse.content.map(toUiTransaction));
+      } catch {
+        setTransactions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchWallet();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[var(--app-gray-50)] pb-6">
@@ -134,14 +124,18 @@ export function PatinhasWalletScreen({ onBack, onNavigate }: PatinhasWalletScree
           </h2>
 
           <div className="space-y-3">
-            {mockTransactions.length === 0 ? (
+            {isLoading ? (
+              <Card className="p-8 text-center">
+                <p className="text-[var(--app-gray-500)]">Carregando transações...</p>
+              </Card>
+            ) : transactions.length === 0 ? (
               <Card className="p-8 text-center">
                 <p className="text-[var(--app-gray-500)]">
                   Nenhuma transação ainda
                 </p>
               </Card>
             ) : (
-              mockTransactions.map((transaction) => (
+              transactions.map((transaction) => (
                 <Card key={transaction.id} className="p-4">
                   <div className="flex items-start gap-4">
                     <div
